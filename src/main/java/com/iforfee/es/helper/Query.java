@@ -1,4 +1,4 @@
-package com.iforfee;
+package com.iforfee.es.helper;
 
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author zhoujun
+ * @author joyo
  * @date 2017/11/2
  */
-public class EsQuery {
+public class Query {
     private String index;
     private String type;
     private Integer size;

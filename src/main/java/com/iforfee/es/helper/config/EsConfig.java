@@ -1,4 +1,4 @@
-package com.iforfee.config;
+package com.iforfee.es.helper.config;
 
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;

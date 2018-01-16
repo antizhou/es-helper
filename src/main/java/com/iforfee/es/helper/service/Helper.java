@@ -1,7 +1,7 @@
-package com.iforfee.service;
+package com.iforfee.es.helper.service;
 
-import com.iforfee.EsQuery;
-import com.iforfee.config.EsConfig;
+import com.iforfee.es.helper.Query;
+import com.iforfee.es.helper.config.EsConfig;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -31,31 +31,31 @@ import java.util.Map;
 
 
 /**
- * @author zhoujun
+ * @author joyo
  * @date 2017/11/2
  */
-public class EsHelper {
-    private static final Logger logger = LoggerFactory.getLogger(EsHelper.class);
+public class Helper {
+    private static final Logger logger = LoggerFactory.getLogger(Helper.class);
     private final TransportClient client;
 
-    public EsHelper(String servers, String clusterName) {
+    public Helper(String servers, String clusterName) {
         client = EsConfig.getClint(servers, clusterName);
     }
 
-    public SearchResponse search(EsQuery esQuery) {
+    public SearchResponse search(Query query) {
         SearchRequestBuilder builder = client
-                .prepareSearch(esQuery.getIndex())
-                .setTypes(esQuery.getType());
-        if (esQuery.getQueryBuilder() != null) {
-            builder.setQuery(esQuery.getQueryBuilder());
+                .prepareSearch(query.getIndex())
+                .setTypes(query.getType());
+        if (query.getQueryBuilder() != null) {
+            builder.setQuery(query.getQueryBuilder());
         }
-        if (esQuery.getSize() != null) {
-            builder.setSize(esQuery.getSize());
+        if (query.getSize() != null) {
+            builder.setSize(query.getSize());
         }
-        for (AggregationBuilder aggregation : esQuery.getAggregations()) {
+        for (AggregationBuilder aggregation : query.getAggregations()) {
             builder.addAggregation(aggregation);
         }
-        Map<String, SortOrder> sorterMap = esQuery.getSorter();
+        Map<String, SortOrder> sorterMap = query.getSorter();
         if (sorterMap.size() > 0) {
             for (String field : sorterMap.keySet()) {
                 builder.addSort(field, sorterMap.get(field));
@@ -73,10 +73,10 @@ public class EsHelper {
     public Map<String, Map<String, Long>> getFilterRules(String index, String type) {
         Map<String, Map<String, Long>> map = new HashMap<>();
         try {
-            EsQuery esQuery = new EsQuery();
-            esQuery.setIndex(index);
-            esQuery.setType(type);
-            SearchResponse sr = this.search(esQuery);
+            Query query = new Query();
+            query.setIndex(index);
+            query.setType(type);
+            SearchResponse sr = this.search(query);
 
             SearchHits searchHits = sr.getHits();
             SearchHit[] hits = searchHits.getHits();
@@ -101,9 +101,9 @@ public class EsHelper {
         return map;
     }
 
-    public boolean insert(EsQuery esQuery) {
-        IndexResponse response = client.prepareIndex(esQuery.getIndex(), esQuery.getType())
-                .setSource(esQuery.getSource(), XContentType.JSON)
+    public boolean insert(Query query) {
+        IndexResponse response = client.prepareIndex(query.getIndex(), query.getType())
+                .setSource(query.getSource(), XContentType.JSON)
                 .get();
         String id = response.getId();
         if (id != null) {
@@ -122,15 +122,15 @@ public class EsHelper {
         return false;
     }
 
-    public List<SearchHits> scrollSearch(EsQuery esQuery) {
+    public List<SearchHits> scrollSearch(Query query) {
         long timeout = 120000;
         String scrollId = "";
         List<String> cursorIds = new LinkedList<>();
 
-        SearchResponse scrollResp = client.prepareSearch(esQuery.getIndex())
-                .setTypes(esQuery.getType())
+        SearchResponse scrollResp = client.prepareSearch(query.getIndex())
+                .setTypes(query.getType())
                 .setScroll(new TimeValue(timeout))
-                .setQuery(esQuery.getQueryBuilder())
+                .setQuery(query.getQueryBuilder())
                 .setSize(10000).get();
 
         List<SearchHits> list = new LinkedList<>();
@@ -155,13 +155,13 @@ public class EsHelper {
         return response.isSucceeded();
     }
 
-    public boolean bulkSave(EsQuery condition) {
+    public boolean bulkSave(Query query) {
 
         BulkRequestBuilder bulkRequest = client.prepareBulk();
 
-        List<Map<String, Object>> data = condition.getBulk();
+        List<Map<String, Object>> data = query.getBulk();
         data.stream().forEach(item -> {
-            bulkRequest.add(client.prepareIndex(condition.getIndex(), condition.getType()).setSource(item));
+            bulkRequest.add(client.prepareIndex(query.getIndex(), query.getType()).setSource(item));
         });
         BulkResponse bulkResponse = bulkRequest.get();
         if (bulkResponse.hasFailures()) {
@@ -194,11 +194,11 @@ public class EsHelper {
 //        return true;
 //    }
 
-    public void deleteByQueryAsync(EsQuery condition) {
+    public void deleteByQueryAsync(Query query) {
 
         DeleteByQueryAction.INSTANCE.newRequestBuilder(client)
-                .filter(condition.getQueryBuilder())
-                .source(condition.getIndex())
+                .filter(query.getQueryBuilder())
+                .source(query.getIndex())
                 .execute(new ActionListener<BulkByScrollResponse>() {
                     @Override
                     public void onResponse(BulkByScrollResponse response) {
@@ -214,28 +214,28 @@ public class EsHelper {
     }
 
 
-    public long deleteByQuery(EsQuery condition) {
+    public long deleteByQuery(Query query) {
         DeleteByQueryRequestBuilder builder = DeleteByQueryAction.INSTANCE.newRequestBuilder(client);
 
         SearchRequestBuilder source = builder.source();
-        source.setQuery(condition.getQueryBuilder());
-        source.setTypes(condition.getType());
-        source.setIndices(condition.getIndex());
+        source.setQuery(query.getQueryBuilder());
+        source.setTypes(query.getType());
+        source.setIndices(query.getIndex());
 
         BulkByScrollResponse response = builder.get();
 
         return response.getDeleted();
     }
 
-    public MultiSearchResponse multiSearch(List<EsQuery> conditions) {
+    public MultiSearchResponse multiSearch(List<Query> queries) {
         List<SearchRequestBuilder> builders = new LinkedList<>();
 
-        conditions.forEach(condition -> {
-            QueryBuilder queryBuilder = condition.getQueryBuilder();
+        queries.forEach(query -> {
+            QueryBuilder queryBuilder = query.getQueryBuilder();
             SearchRequestBuilder sr = client
                     .prepareSearch().setQuery(queryBuilder).setSize(1);
 
-            for (AggregationBuilder aggregation : condition.getAggregations()) {
+            for (AggregationBuilder aggregation : query.getAggregations()) {
                 sr.addAggregation(aggregation);
             }
             builders.add(sr);
